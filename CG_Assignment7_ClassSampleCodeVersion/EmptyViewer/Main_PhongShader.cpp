@@ -1,25 +1,27 @@
 #include <Windows.h>
 #include <iostream>
 #include <GL/glew.h>
-#include <GL/gl.h>
+#include <GL/GL.h>
 #include <GL/freeglut.h>
 
 #define GLFW_INCLUDE_GLU
-#define GLEW_DLL
+#define GLFW_DLL
 #include <GLFW/glfw3.h>
+#include <vector>
 
 #define GLM_SWIZZLE
+#define GLM_FORCE_RADIANS
 #include <glm/glm.hpp>
 #include <glm/gtc/constants.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/string_cast.hpp>
-
-#include <vector>
 #include <fstream>
 #include <sstream>
+#include <string>
 
 using namespace glm;
-
+#define M_PI 3.14159265358979323846
 GLuint LoadShaders(const std::string& vertex_file_path, const std::string& fragment_file_path)
 {
     // Create the shaders
@@ -146,8 +148,8 @@ void Update_mesh(const GLuint& VAO, const std::vector<GLuint>& GLBuffers,
 // --------------------------------------------------
 // Global Variables
 // --------------------------------------------------
-int Width = 1280;
-int Height = 720;
+int Width = 512;
+int Height = 512;
 // --------------------------------------------------
 
 void resize_callback(GLFWwindow*, int nw, int nh)
@@ -209,33 +211,8 @@ int main(int argc, char* argv[])
     // Create and compile our GLSL program from the shaders
     GLuint shaderProgram = LoadShaders("Shader.vs", "Shader.fs");
 
-    std::vector<glm::vec3> Positions = {
-        glm::vec3(0.5f, -0.5f, 0.0f),  // top right
-        glm::vec3(0.5f,  0.5f, 0.0f),  // bottom right
-        glm::vec3(-0.5f,  0.5f, 0.0f), // bottom left
-        glm::vec3(-0.5f, -0.5f, 0.0f), // top left
-    };
 
-    std::vector<glm::vec3> Normals = {
-        glm::vec3(0.0f, 0.0f, 0.1f),
-        glm::vec3(0.0f, 0.0f, 0.1f),
-        glm::vec3(0.0f, 0.0f, 0.1f),
-        glm::vec3(0.0f, 0.0f, 0.1f),
-    };
 
-    std::vector<glm::vec3> Colors = {
-        glm::vec3(1.0f, 0.0f, 0.0f),
-        glm::vec3(0.0f, 1.0f, 0.0f),
-        glm::vec3(0.0f, 0.0f, 1.0f),
-        glm::vec3(0.0f, 0.0f, 1.0f),
-    };
-
-    std::vector<unsigned int> Indices = { // note that we start from 0!
-        0, 1, 3, // first Triangle
-        1, 2, 3  // second Triangle
-    };
-
-    glm::mat4 model = glm::mat4(1.0f); // Identity matrix for model transformation
 
     GLuint VAO;
     glGenVertexArrays(1, &VAO);
@@ -244,7 +221,73 @@ int main(int argc, char* argv[])
     std::vector<GLuint> GLBuffers;
     GLBuffers.resize(numBuffers, 0);
     glGenBuffers(numBuffers, &GLBuffers[0]);
+    std::vector<glm::vec3> Positions;
+    std::vector<glm::vec3> Normals;
+    std::vector<glm::vec3> Colors;
+    std::vector<unsigned int> Indices;
 
+    const int width = 32;
+    const int height = 16;
+
+    for (int j = 1; j < height - 1; ++j) {
+        for (int i = 0; i < width; ++i) {
+            float theta = (float)j / (height - 1) * M_PI;
+            float phi = (float)i / (width - 1) * 2 * M_PI;
+
+            float x = sinf(theta) * cosf(phi);
+            float y = cosf(theta);
+            float z = -sinf(theta) * sinf(phi);
+
+            glm::vec3 pos = glm::vec3(x, y, z);
+            Positions.push_back(pos);
+            Normals.push_back(glm::normalize(pos));
+            Colors.push_back(glm::vec3(0.0f, 1.0f, 0.0f)); // 녹색
+        }
+    }
+
+    // 위쪽 극점
+    Positions.push_back(glm::vec3(0, 1, 0));
+    Normals.push_back(glm::vec3(0, 1, 0));
+    Colors.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
+
+    // 아래쪽 극점
+    Positions.push_back(glm::vec3(0, -1, 0));
+    Normals.push_back(glm::vec3(0, -1, 0));
+    Colors.push_back(glm::vec3(0.0f, 1.0f, 0.0f));
+
+    const int topIndex = Positions.size() - 2;
+    const int bottomIndex = Positions.size() - 1;
+
+    // 인덱스 생성
+    for (int j = 0; j < height - 3; ++j) {
+        for (int i = 0; i < width - 1; ++i) {
+            int curr = j * width + i;
+            int next = (j + 1) * width + i;
+
+            Indices.push_back(curr);
+            Indices.push_back(next + 1);
+            Indices.push_back(curr + 1);
+
+            Indices.push_back(curr);
+            Indices.push_back(next);
+            Indices.push_back(next + 1);
+        }
+    }
+
+    // top cap
+    for (int i = 0; i < width - 1; ++i) {
+        Indices.push_back(topIndex);
+        Indices.push_back(i);
+        Indices.push_back(i + 1);
+    }
+
+    // bottom cap
+    int base = (height - 3) * width;
+    for (int i = 0; i < width - 1; ++i) {
+        Indices.push_back(bottomIndex);
+        Indices.push_back(base + i + 1);
+        Indices.push_back(base + i);
+    }
     Update_mesh(VAO, GLBuffers, Positions, Normals, Colors, Indices);
 
     /* Loop until the user closes the window */
@@ -262,7 +305,51 @@ int main(int argc, char* argv[])
         glUseProgram(shaderProgram);
 
         // update uniform
-        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, &model[0][0]);
+
+
+    // 행렬 유니폼
+
+         // 조명 위치와 색상
+        vec3 lightPos = vec3(-4.0f, 4.0f, -3.0f);
+        vec3 lightColor = vec3(1.0f, 1.0f, 1.0f);
+
+        // 조명 유니폼
+        glUniform3fv(glGetUniformLocation(shaderProgram, "lightPos"), 1, value_ptr(lightPos));
+        glUniform3fv(glGetUniformLocation(shaderProgram, "lightColor"), 1, value_ptr(lightColor));
+
+        // ambient light
+        vec3 Ia = vec3(0.2f);
+        glUniform3fv(glGetUniformLocation(shaderProgram, "Ia"), 1, value_ptr(Ia));
+
+        // 재질 계수
+        vec3 ka = vec3(0.0f, 1.0f, 0.0f);
+        vec3 kd = vec3(0.0f, 0.5f, 0.0f);
+        vec3 ks = vec3(0.5f);
+        float shininess = 32.0f;
+
+        glUniform3fv(glGetUniformLocation(shaderProgram, "ka"), 1, value_ptr(ka));
+        glUniform3fv(glGetUniformLocation(shaderProgram, "kd"), 1, value_ptr(kd));
+        glUniform3fv(glGetUniformLocation(shaderProgram, "ks"), 1, value_ptr(ks));
+        glUniform1f(glGetUniformLocation(shaderProgram, "shininess"), shininess);
+
+
+        mat4 modeling = translate(mat4(1.0f), vec3(0, 0, -7)) * scale(mat4(1.0f), vec3(2.0f));
+        mat4 modeling_inv_tr = transpose(inverse(modeling));
+
+        vec3 eye = vec3(0, 0, 0);
+        glUniform3fv(glGetUniformLocation(shaderProgram, "eyePos"), 1, value_ptr(eye));
+        vec3 center = vec3(0, 0, -1);  // e - w
+        vec3 up = vec3(0, 1, 0);       // v
+        mat4 camera = lookAt(eye, center, up);
+        mat4 projection = frustum(-0.1f, 0.1f, -0.1f, 0.1f, 0.1f, 1000.0f);
+
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modeling"), 1, GL_FALSE, value_ptr(modeling));
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "modeling_inv_tr"), 1, GL_FALSE, value_ptr(modeling_inv_tr));
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "camera"), 1, GL_FALSE, value_ptr(camera));
+        glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "projection"), 1, GL_FALSE, value_ptr(projection));
+
+
+        //glUniformMatrix4fv(glGetUniformLocation(shaderProgram, "model"), 1, GL_FALSE, value_ptr(modeling));
 
         glBindVertexArray(VAO);
         // Draw the triangle!

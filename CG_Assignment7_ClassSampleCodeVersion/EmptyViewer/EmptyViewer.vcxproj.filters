@@ -26,5 +26,6 @@
     <Text Include="Shader.vs">
       <Filter>Source Files</Filter>
     </Text>
+    <Text Include="c.txt" />
   </ItemGroup>
 </Project>
